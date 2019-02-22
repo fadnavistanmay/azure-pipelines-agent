@@ -165,6 +165,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                     public static readonly string Replace = "replace";
                     public static readonly string NoRestart = "norestart";
                     public static readonly string LaunchBrowser = "launchbrowser";
+                    public static readonly string Once = "once";
                     public static readonly string RunAsAutoLogon = "runasautologon";
                     public static readonly string RunAsService = "runasservice";
                     public static readonly string SslSkipCertValidation = "sslskipcertvalidation";

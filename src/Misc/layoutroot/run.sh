@@ -24,5 +24,13 @@ shopt -s nocasematch
 if [[ "$1" == "localRun" ]]; then
     $DIR/bin/Agent.Listener $*
 else
-    $DIR/bin/Agent.Listener run $*
+    if [[ "$1" == "--once" ]]; then
+        $DIR/bin/Agent.Listener run $*
+        while [[ $? == 3 ]]; then
+            sleep 5 >nul
+            $DIR/bin/Agent.Listener run $*
+        done
+    else
+        $DIR/bin/Agent.Listener run $*
+    fi
 fi
