@@ -310,7 +310,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
 
                 var messages = new Queue<TaskAgentMessage>();
                 messages.Enqueue(message);
-                var signalWorkerComplete = new SemaphoreSlim(0, 1);
                 _configurationManager.Setup(x => x.LoadSettings())
                     .Returns(settings);
                 _configurationManager.Setup(x => x.IsConfigured())
@@ -322,8 +321,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
                         {
                             if (0 == messages.Count)
                             {
-                                signalWorkerComplete.Release();
-                                await Task.Delay(2000, hc.AgentShutdownToken);
+                                await Task.Delay(2000);
                             }
 
                             return messages.Dequeue();
@@ -360,29 +358,19 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
                 Task<int> agentTask = agent.ExecuteCommand(command);
 
                 //Assert
-                //wait for the agent to run one job
-                if (!await signalWorkerComplete.WaitAsync(2000))
-                {
-                    Assert.True(false, $"{nameof(_messageListener.Object.GetNextMessageAsync)} was not invoked.");
-                }
-                else
-                {
-                    //Assert
-                    Task[] taskToWait2 = { agentTask, Task.Delay(3000) };
-                    //wait for the Agent to exit
-                    await Task.WhenAny(taskToWait2);
+                //wait for the agent to run one job and exit
+                await Task.WhenAny(agentTask, Task.Delay(3000));
 
-                    Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
-                    Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
-                    Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
+                Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
+                Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
+                Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
 
-                    _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
-                         $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
-                    _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
-                    _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
-                    _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
-                    _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.AtLeastOnce());
-                }
+                _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
+                     $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
+                _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
+                _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
+                _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.AtLeastOnce());
             }
         }
 
@@ -425,7 +413,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
                 var messages = new Queue<TaskAgentMessage>();
                 messages.Enqueue(message1);
                 messages.Enqueue(message2);
-                var signalWorkerComplete = new SemaphoreSlim(0, 1);
                 _configurationManager.Setup(x => x.LoadSettings())
                     .Returns(settings);
                 _configurationManager.Setup(x => x.IsConfigured())
@@ -437,8 +424,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
                         {
                             if (0 == messages.Count)
                             {
-                                signalWorkerComplete.Release();
-                                await Task.Delay(2000, hc.AgentShutdownToken);
+                                await Task.Delay(2000);
                             }
 
                             return messages.Dequeue();
@@ -475,29 +461,19 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
                 Task<int> agentTask = agent.ExecuteCommand(command);
 
                 //Assert
-                //wait for the agent to run one job
-                if (!await signalWorkerComplete.WaitAsync(2000))
-                {
-                    Assert.True(false, $"{nameof(_messageListener.Object.GetNextMessageAsync)} was not invoked.");
-                }
-                else
-                {
-                    //Assert
-                    Task[] taskToWait2 = { agentTask, Task.Delay(3000) };
-                    //wait for the Agent to exit
-                    await Task.WhenAny(taskToWait2);
+                //wait for the agent to run one job and exit
+                await Task.WhenAny(agentTask, Task.Delay(3000));
 
-                    Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
-                    Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
-                    Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
+                Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
+                Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
+                Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
 
-                    _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
-                         $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
-                    _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
-                    _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
-                    _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
-                    _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.Once());
-                }
+                _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
+                     $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
+                _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
+                _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
+                _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.Once());
             }
         }
     }
