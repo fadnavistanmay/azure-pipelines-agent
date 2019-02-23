@@ -359,7 +359,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
 
                 //Assert
                 //wait for the agent to run one job and exit
-                await Task.WhenAny(agentTask, Task.Delay(3000));
+                await Task.WhenAny(agentTask, Task.Delay(10000));
 
                 Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
                 Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
@@ -462,7 +462,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
 
                 //Assert
                 //wait for the agent to run one job and exit
-                await Task.WhenAny(agentTask, Task.Delay(3000));
+                await Task.WhenAny(agentTask, Task.Delay(10000));
 
                 Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
                 Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
