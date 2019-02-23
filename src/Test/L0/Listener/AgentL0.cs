@@ -278,60 +278,227 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Listener
             }
         }
 
-        // [Fact]
-        // [Trait("Level", "L0")]
-        // [Trait("Category", "Agent")]
-        // public async void BlockFurtherJobForOneTimeAgent()
-        // {
-        //     using (var hc = new TestHostContext(this))
-        //     {
-        //         var usedRecordFile = hc.GetConfigFile(WellKnownConfigFile.Used);
-        //         try
-        //         {
-        //             var usedRecord = new AgentConsumptionRecord()
-        //             {
-        //                 RequestId = 1,
-        //                 ReceiveTime = DateTime.UtcNow,
-        //                 Info = new TaskOrchestrationPlanReference()
-        //                 {
-        //                     Definition = new TaskOrchestrationOwner() { Name = "test" },
-        //                     Owner = new TaskOrchestrationOwner() { Name = "test" }
-        //                 }
-        //             };
-        //             IOUtil.SaveObject(usedRecord, usedRecordFile);
+        [Fact]
+        [Trait("Level", "L0")]
+        [Trait("Category", "Agent")]
+        public async void TestRunOnce()
+        {
+            using (var hc = new TestHostContext(this))
+            {
+                //Arrange
+                var agent = new Agent.Listener.Agent();
+                hc.SetSingleton<IConfigurationManager>(_configurationManager.Object);
+                hc.SetSingleton<IJobNotification>(_jobNotification.Object);
+                hc.SetSingleton<IMessageListener>(_messageListener.Object);
+                hc.SetSingleton<IPromptManager>(_promptManager.Object);
+                hc.SetSingleton<IAgentServer>(_agentServer.Object);
+                hc.SetSingleton<IVstsAgentWebProxy>(_proxy.Object);
+                hc.SetSingleton<IAgentCertificateManager>(_cert.Object);
+                hc.SetSingleton<IConfigurationStore>(_configStore.Object);
+                agent.Initialize(hc);
+                var settings = new AgentSettings
+                {
+                    PoolId = 43242
+                };
 
-        //             hc.SetSingleton<IConfigurationManager>(_configurationManager.Object);
-        //             hc.SetSingleton<IPromptManager>(_promptManager.Object);
-        //             hc.SetSingleton<IMessageListener>(_messageListener.Object);
-        //             hc.SetSingleton<IVstsAgentWebProxy>(_proxy.Object);
-        //             hc.SetSingleton<IAgentCertificateManager>(_cert.Object);
-        //             hc.SetSingleton<IConfigurationStore>(_configStore.Object);
+                var message = new TaskAgentMessage()
+                {
+                    Body = JsonUtility.ToString(CreateJobRequestMessage("job1")),
+                    MessageId = 4234,
+                    MessageType = JobRequestMessageTypes.AgentJobRequest
+                };
 
-        //             var command = new CommandSettings(hc, new string[] { });
+                var messages = new Queue<TaskAgentMessage>();
+                messages.Enqueue(message);
+                var signalWorkerComplete = new SemaphoreSlim(0, 1);
+                _configurationManager.Setup(x => x.LoadSettings())
+                    .Returns(settings);
+                _configurationManager.Setup(x => x.IsConfigured())
+                    .Returns(true);
+                _messageListener.Setup(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()))
+                    .Returns(Task.FromResult<bool>(true));
+                _messageListener.Setup(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()))
+                    .Returns(async () =>
+                        {
+                            if (0 == messages.Count)
+                            {
+                                signalWorkerComplete.Release();
+                                await Task.Delay(2000, hc.AgentShutdownToken);
+                            }
 
-        //             _configurationManager.Setup(x => x.IsConfigured()).
-        //                 Returns(true);
-        //             _configurationManager.Setup(x => x.LoadSettings())
-        //                 .Returns(new AgentSettings { });
+                            return messages.Dequeue();
+                        });
+                _messageListener.Setup(x => x.DeleteSessionAsync())
+                    .Returns(Task.CompletedTask);
+                _messageListener.Setup(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()))
+                    .Returns(Task.CompletedTask);
 
-        //             _configStore.Setup(x => x.IsServiceConfigured())
-        //                 .Returns(false);
+                var runOnceJobCompleted = new TaskCompletionSource<bool>();
+                _jobDispatcher.Setup(x => x.RunOnceJobCompleted)
+                    .Returns(runOnceJobCompleted);
+                _jobDispatcher.Setup(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), It.IsAny<bool>()))
+                    .Callback(() =>
+                    {
+                        runOnceJobCompleted.TrySetResult(true);
+                    });
+                _jobNotification.Setup(x => x.StartClient(It.IsAny<String>(), It.IsAny<CancellationToken>()))
+                    .Callback(() =>
+                    {
 
-        //             _messageListener.Setup(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()))
-        //                 .Returns(Task.FromResult(false));
+                    });
+                _jobNotification.Setup(x => x.StartClient(It.IsAny<String>()))
+                    .Callback(() =>
+                    {
 
-        //             var agent = new Agent.Listener.Agent();
-        //             agent.Initialize(hc);
-        //             var returnCode = await agent.ExecuteCommand(command);
+                    });
 
-        //             _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Never());
-        //             Assert.Equal(returnCode, Constants.Agent.ReturnCode.TerminatedError);
-        //         }
-        //         finally
-        //         {
-        //             IOUtil.DeleteFile(usedRecordFile);
-        //         }
-        //     }
-        // }
+                hc.EnqueueInstance<IJobDispatcher>(_jobDispatcher.Object);
+
+                _configStore.Setup(x => x.IsServiceConfigured()).Returns(false);
+                //Act
+                var command = new CommandSettings(hc, new string[] { "run", "--once" });
+                Task<int> agentTask = agent.ExecuteCommand(command);
+
+                //Assert
+                //wait for the agent to run one job
+                if (!await signalWorkerComplete.WaitAsync(2000))
+                {
+                    Assert.True(false, $"{nameof(_messageListener.Object.GetNextMessageAsync)} was not invoked.");
+                }
+                else
+                {
+                    //Assert
+                    Task[] taskToWait2 = { agentTask, Task.Delay(3000) };
+                    //wait for the Agent to exit
+                    await Task.WhenAny(taskToWait2);
+
+                    Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
+                    Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
+                    Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
+
+                    _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
+                         $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
+                    _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                    _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
+                    _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
+                    _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.AtLeastOnce());
+                }
+            }
+        }
+
+        [Fact]
+        [Trait("Level", "L0")]
+        [Trait("Category", "Agent")]
+        public async void TestRunOnceOnlyTakeOneJobMessage()
+        {
+            using (var hc = new TestHostContext(this))
+            {
+                //Arrange
+                var agent = new Agent.Listener.Agent();
+                hc.SetSingleton<IConfigurationManager>(_configurationManager.Object);
+                hc.SetSingleton<IJobNotification>(_jobNotification.Object);
+                hc.SetSingleton<IMessageListener>(_messageListener.Object);
+                hc.SetSingleton<IPromptManager>(_promptManager.Object);
+                hc.SetSingleton<IAgentServer>(_agentServer.Object);
+                hc.SetSingleton<IVstsAgentWebProxy>(_proxy.Object);
+                hc.SetSingleton<IAgentCertificateManager>(_cert.Object);
+                hc.SetSingleton<IConfigurationStore>(_configStore.Object);
+                agent.Initialize(hc);
+                var settings = new AgentSettings
+                {
+                    PoolId = 43242
+                };
+
+                var message1 = new TaskAgentMessage()
+                {
+                    Body = JsonUtility.ToString(CreateJobRequestMessage("job1")),
+                    MessageId = 4234,
+                    MessageType = JobRequestMessageTypes.AgentJobRequest
+                };
+                var message2 = new TaskAgentMessage()
+                {
+                    Body = JsonUtility.ToString(CreateJobRequestMessage("job1")),
+                    MessageId = 4235,
+                    MessageType = JobRequestMessageTypes.AgentJobRequest
+                };
+
+                var messages = new Queue<TaskAgentMessage>();
+                messages.Enqueue(message1);
+                messages.Enqueue(message2);
+                var signalWorkerComplete = new SemaphoreSlim(0, 1);
+                _configurationManager.Setup(x => x.LoadSettings())
+                    .Returns(settings);
+                _configurationManager.Setup(x => x.IsConfigured())
+                    .Returns(true);
+                _messageListener.Setup(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()))
+                    .Returns(Task.FromResult<bool>(true));
+                _messageListener.Setup(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()))
+                    .Returns(async () =>
+                        {
+                            if (0 == messages.Count)
+                            {
+                                signalWorkerComplete.Release();
+                                await Task.Delay(2000, hc.AgentShutdownToken);
+                            }
+
+                            return messages.Dequeue();
+                        });
+                _messageListener.Setup(x => x.DeleteSessionAsync())
+                    .Returns(Task.CompletedTask);
+                _messageListener.Setup(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()))
+                    .Returns(Task.CompletedTask);
+
+                var runOnceJobCompleted = new TaskCompletionSource<bool>();
+                _jobDispatcher.Setup(x => x.RunOnceJobCompleted)
+                    .Returns(runOnceJobCompleted);
+                _jobDispatcher.Setup(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), It.IsAny<bool>()))
+                    .Callback(() =>
+                    {
+                        runOnceJobCompleted.TrySetResult(true);
+                    });
+                _jobNotification.Setup(x => x.StartClient(It.IsAny<String>(), It.IsAny<CancellationToken>()))
+                    .Callback(() =>
+                    {
+
+                    });
+                _jobNotification.Setup(x => x.StartClient(It.IsAny<String>()))
+                    .Callback(() =>
+                    {
+
+                    });
+
+                hc.EnqueueInstance<IJobDispatcher>(_jobDispatcher.Object);
+
+                _configStore.Setup(x => x.IsServiceConfigured()).Returns(false);
+                //Act
+                var command = new CommandSettings(hc, new string[] { "run", "--once" });
+                Task<int> agentTask = agent.ExecuteCommand(command);
+
+                //Assert
+                //wait for the agent to run one job
+                if (!await signalWorkerComplete.WaitAsync(2000))
+                {
+                    Assert.True(false, $"{nameof(_messageListener.Object.GetNextMessageAsync)} was not invoked.");
+                }
+                else
+                {
+                    //Assert
+                    Task[] taskToWait2 = { agentTask, Task.Delay(3000) };
+                    //wait for the Agent to exit
+                    await Task.WhenAny(taskToWait2);
+
+                    Assert.True(agentTask.IsCompleted, $"{nameof(agent.ExecuteCommand)} timed out.");
+                    Assert.True(!agentTask.IsFaulted, agentTask.Exception?.ToString());
+                    Assert.True(agentTask.Result == Constants.Agent.ReturnCode.Success);
+
+                    _jobDispatcher.Verify(x => x.Run(It.IsAny<Pipelines.AgentJobRequestMessage>(), true), Times.Once(),
+                         $"{nameof(_jobDispatcher.Object.Run)} was not invoked.");
+                    _messageListener.Verify(x => x.GetNextMessageAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                    _messageListener.Verify(x => x.CreateSessionAsync(It.IsAny<CancellationToken>()), Times.Once());
+                    _messageListener.Verify(x => x.DeleteSessionAsync(), Times.Once());
+                    _messageListener.Verify(x => x.DeleteMessageAsync(It.IsAny<TaskAgentMessage>()), Times.Once());
+                }
+            }
+        }
     }
 }

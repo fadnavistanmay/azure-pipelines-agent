@@ -388,6 +388,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
                                 if (autoUpdateInProgress || runOnceJobReceived)
                                 {
                                     skipMessageDeletion = true;
+                                    Trace.Info($"Skip message deletion for job request message '{message.MessageId}'.");
                                 }
                                 else
                                 {
@@ -416,6 +417,11 @@ namespace Microsoft.VisualStudio.Services.Agent.Listener
                                 var cancelJobMessage = JsonUtility.FromString<JobCancelMessage>(message.Body);
                                 bool jobCancelled = jobDispatcher.Cancel(cancelJobMessage);
                                 skipMessageDeletion = (autoUpdateInProgress || runOnceJobReceived) && !jobCancelled;
+
+                                if (skipMessageDeletion)
+                                {
+                                    Trace.Info($"Skip message deletion for cancellation message '{message.MessageId}'.");
+                                }
                             }
                             else
                             {
