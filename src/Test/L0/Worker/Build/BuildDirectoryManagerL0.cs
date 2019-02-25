@@ -221,7 +221,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
                 _trackingManager.Verify(x => x.LoadIfExists(_ec.Object, _trackingFile));
                 _trackingManager.Verify(x => x.UpdateJobRunProperties(_ec.Object, _existingConfig, _trackingFile));
 
-                Assert.True(_existingConfig.RepositoryDirectory.Contains("test\\foo"), "Repository not move to right location.");
+                Assert.True(_existingConfig.SourcesDirectory.Contains("test\\foo"), "Repository not move to right location.");
             }
         }
 
@@ -248,13 +248,13 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
                 // Assert.
                 _trackingManager.Verify(x => x.LoadIfExists(_ec.Object, _trackingFile));
                 _trackingManager.Verify(x => x.UpdateJobRunProperties(_ec.Object, _existingConfig, _trackingFile));
-                Assert.True(_existingConfig.RepositoryDirectory.Contains("test\\foo"), "Repository not move to right location.");
+                Assert.True(_existingConfig.SourcesDirectory.Contains("test\\foo"), "Repository not move to right location.");
 
                 // Assert.
                 _trackingManager.Verify(x => x.LoadIfExists(_ec.Object, _trackingFile));
                 _trackingManager.Verify(x => x.UpdateJobRunProperties(_ec.Object, _existingConfig, _trackingFile));
                 _buildDirectoryManager.PrepareDirectory(_ec.Object, _repository, _workspaceOptions);
-                Assert.Equal(_existingConfig.SourcesDirectory, _existingConfig.RepositoryDirectory);
+                Assert.Equal(_existingConfig.SourcesDirectory, Path.Combine(_existingConfig.BuildDirectory, Constants.Build.Path.SourcesDirectory));
             }
         }
 
@@ -318,34 +318,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
 
                 // Assert.
                 Assert.False(unexpected, "Prepare directory should failed with invalid repository path (invalid char in path).");
-
-                unexpected = false;
-                repository = new Pipelines.RepositoryResource()
-                {
-                    Alias = "test",
-                    Type = Pipelines.RepositoryTypes.Git,
-                    Url = new Uri("http://contoso.visualstudio.com"),
-                };
-                repository.Properties.Set<String>(Pipelines.RepositoryPropertyNames.Name, "Some endpoint name");
-#if OS_WINDOWS
-                repository.Properties.Set(Pipelines.RepositoryPropertyNames.Path, "..\\test");
-#else
-                repository.Properties.Set(Pipelines.RepositoryPropertyNames.Path, "../test");
-#endif
-
-                // Act.
-                try
-                {
-                    _buildDirectoryManager.PrepareDirectory(_ec.Object, repository, _workspaceOptions);
-                    unexpected = true;
-                }
-                catch (Exception ex)
-                {
-                    hc.GetTrace().Error(ex);
-                }
-
-                // Assert.
-                Assert.False(unexpected, "Tracking file creation should failed with invalid repository path (un-relative path).");
             }
         }
 

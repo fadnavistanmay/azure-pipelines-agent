@@ -364,7 +364,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
   ""fileFormatVersion"": 3,
   ""lastRunOn"": ""09/16/2015 23:56:46 -04:00"",
   ""repositoryType"": ""tfsgit"",
-  ""repositoryDirectory"": ""b00335b6\\gitTest"",
   ""lastMaintenanceAttemptedOn"": ""09/16/2015 23:56:46 -04:00"",
   ""lastMaintenanceCompletedOn"": ""09/16/2015 23:56:46 -04:00"",
   ""build_sourcesdirectory"": ""b00335b6\\gitTest"",
@@ -449,7 +448,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
   ""fileFormatVersion"": 3,
   ""lastRunOn"": """",
   ""repositoryType"": """",
-  ""repositoryDirectory"": ""b00335b6\\s"",
   ""lastMaintenanceAttemptedOn"": """",
   ""lastMaintenanceCompletedOn"": """",
   ""build_sourcesdirectory"": ""b00335b6\\s"",
@@ -556,16 +554,13 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
                 Assert.True(testStartOn.AddSeconds(-1) <= config.LastRunOn);
                 Assert.True(DateTimeOffset.Now.AddSeconds(1) >= config.LastRunOn);
                 Assert.Equal(RepositoryUrl, config.RepositoryUrl);
-                Assert.Equal(
-                    Path.Combine("1", Constants.Build.Path.SourcesDirectory),
-                    config.SourcesDirectory);
                 Assert.Equal("build", config.System);
                 Assert.Equal(
                     Path.Combine("1", Constants.Build.Path.TestResultsDirectory),
                     config.TestResultsDirectory);
                 Assert.Equal(
-                    Path.Combine("1", Constants.Build.Path.SourcesDirectory, "foo\\bar"),
-                    config.RepositoryDirectory);
+                    Path.Combine("1", "foo\\bar"),
+                    config.SourcesDirectory);
             }
         }
 
@@ -596,7 +591,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
                     _trackingManager.Create(_ec.Object, repository, HashKey, trackingFile, false);
                     unexpected = true;
                     TrackingConfig config = _trackingManager.LoadIfExists(_ec.Object, trackingFile) as TrackingConfig;
-                    trace.Info("Repository directory: " + config.RepositoryDirectory);
+                    trace.Info("Repository directory: " + config.SourcesDirectory);
                 }
                 catch (Exception ex)
                 {
@@ -616,7 +611,7 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
                     _trackingManager.Create(_ec.Object, repository, HashKey, trackingFile, false);
                     unexpected = true;
                     TrackingConfig config = _trackingManager.LoadIfExists(_ec.Object, trackingFile) as TrackingConfig;
-                    trace.Info("Repository directory: " + config.RepositoryDirectory);
+                    trace.Info("Repository directory: " + config.SourcesDirectory);
                 }
                 catch (Exception ex)
                 {
@@ -625,30 +620,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Tests.Worker.Build
 
                 // Assert.
                 Assert.False(unexpected, "Tracking file creation should failed with invalid repository path (invalid char in path).");
-
-                // Act.
-                unexpected = false;
-                repository = new Pipelines.RepositoryResource() { Url = new Uri(RepositoryUrl) };
-#if OS_WINDOWS
-                repository.Properties.Set(Pipelines.RepositoryPropertyNames.Path, "..\\test");
-#else
-                repository.Properties.Set(Pipelines.RepositoryPropertyNames.Path, "../test");
-#endif
-
-                try
-                {
-                    _trackingManager.Create(_ec.Object, repository, HashKey, trackingFile, false);
-                    unexpected = true;
-                    TrackingConfig config = _trackingManager.LoadIfExists(_ec.Object, trackingFile) as TrackingConfig;
-                    trace.Info("Repository directory: " + config.RepositoryDirectory);
-                }
-                catch (Exception ex)
-                {
-                    trace.Error(ex);
-                }
-
-                // Assert.
-                Assert.False(unexpected, "Tracking file creation should failed with invalid repository path (un-relative path).");
             }
         }
     }

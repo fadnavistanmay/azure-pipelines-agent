@@ -41,7 +41,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
             HashKey = copy.HashKey;
             RepositoryType = repositoryType;
             RepositoryUrl = copy.RepositoryUrl;
-            RepositoryDirectory = SourcesDirectory;
             System = copy.System;
         }
 
@@ -63,31 +62,10 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
             HashKey = hashKey;
             RepositoryUrl = repository.Url.AbsoluteUri;
             RepositoryType = repository.Type;
-            RepositoryDirectory = SourcesDirectory;
             var path = repository.Properties.Get<string>(RepositoryPropertyNames.Path);
             if (!string.IsNullOrEmpty(path))
             {
-                if (path.IndexOfAny(Path.GetInvalidPathChars()) > -1)
-                {
-                    throw new InvalidOperationException($"{path} contains invalid path characters.");
-                }
-                else if (Path.GetFileName(path).IndexOfAny(Path.GetInvalidFileNameChars()) > -1)
-                {
-                    throw new InvalidOperationException($"{path} contains invalid folder name characters.");
-                }
-                else if (path.Contains($"..{Path.DirectorySeparatorChar}") || path.Contains($"..{Path.AltDirectorySeparatorChar}"))
-                {
-                    throw new InvalidOperationException($"{path} can not contains relative path.");
-                }
-                else if (Path.IsPathRooted(path))
-                {
-                    throw new InvalidOperationException($"{path} can not be a rooted path.");
-                }
-                else
-                {
-                    RepositoryDirectory = Path.Combine(SourcesDirectory, path);
-                    repository.Properties.Set<string>(RepositoryPropertyNames.Path, RepositoryDirectory);
-                }
+                SourcesDirectory = IOUtil.ResolvePath(BuildDirectory, path);
             }
 
             System = BuildSystem;
@@ -154,8 +132,6 @@ namespace Microsoft.VisualStudio.Services.Agent.Worker.Build
         }
 
         public string RepositoryType { get; set; }
-
-        public string RepositoryDirectory { get; set; }
 
         [JsonIgnore]
         public DateTimeOffset? LastMaintenanceAttemptedOn { get; set; }
