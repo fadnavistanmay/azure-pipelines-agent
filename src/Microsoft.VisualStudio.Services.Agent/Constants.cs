@@ -138,6 +138,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                     public const string OverwriteAutoLogon = "overwriteautologon";
                     public const string GitUseSChannel = "gituseschannel";
                     public const string Help = "help";
+                    public const string DisableLogUploads = "disableloguploads";
                     public const string MachineGroup = "machinegroup";
                     public const string Replace = "replace";
                     public const string NoRestart = "norestart";
@@ -268,6 +269,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                 public static readonly string AcceptTeeEula = "agent.acceptteeeula";
                 public static readonly string BuildDirectory = "agent.builddirectory";
                 public static readonly string ContainerId = "agent.containerid";
+                public static readonly string ContainerMapping = "agent.containermapping";
                 public static readonly string ContainerNetwork = "agent.containernetwork";
                 public static readonly string Diagnostic = "agent.diagnostic";
                 public static readonly string HomeDirectory = "agent.homedirectory";
@@ -430,6 +432,7 @@ namespace Microsoft.VisualStudio.Services.Agent
                 Agent.AcceptTeeEula,
                 Agent.BuildDirectory,
                 Agent.ContainerId,
+                Agent.ContainerMapping,
                 Agent.ContainerNetwork,
                 Agent.Diagnostic,
                 Agent.HomeDirectory,

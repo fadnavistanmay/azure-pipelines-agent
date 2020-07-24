@@ -7,7 +7,7 @@ L1_MODE=$4
 CONTAINER_URL=https://vstsagenttools.blob.core.windows.net/tools
 NODE_URL=https://nodejs.org/dist
 NODE_VERSION="6.17.1"
-NODE10_VERSION="10.19.0"
+NODE10_VERSION="10.21.0"
 MINGIT_VERSION="2.26.2"
 
 get_abs_path() {
@@ -79,10 +79,12 @@ function acquireExternalTool() {
             # Extract to current directory
             # Ensure we can extract those files
             # We might use them during dev.sh
+            local extract_dir="$download_dir/$download_basename.extract" 
+            mkdir -p "$extract_dir" || checkRC 'mkdir'
             if [[ "$download_basename" == *.zip ]]; then
                 # Extract the zip.
                 echo "Testing zip"
-                unzip "$download_target" -d "$download_dir" > /dev/null
+                unzip "$download_target" -d "$extract_dir" > /dev/null
                 local rc=$?
                 if [[ $rc -ne 0 && $rc -ne 1 ]]; then
                     failed "unzip failed with return code $rc"
@@ -90,7 +92,7 @@ function acquireExternalTool() {
             elif [[ "$download_basename" == *.tar.gz ]]; then
                 # Extract the tar gz.
                 echo "Testing tar gz"
-                tar xzf "$download_target" -C "$download_dir" > /dev/null || checkRC 'tar'
+                tar xzf "$download_target" -C "$extract_dir" > /dev/null || checkRC 'tar'
             fi
         fi
     else
