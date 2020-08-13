@@ -283,10 +283,23 @@ namespace Agent.Plugins.PipelineArtifact
             VssConnection connection = context.VssConnection;
             BuildHttpClient buildHttpClient = connection.GetClient<BuildHttpClient>();
 
+            /*for (int i=0; i< 1000;i++)
+            {
+                Console.WriteLine("Inside");
+                Thread.Sleep(100);
+            }*/
+
             var isDefinitionNum = Int32.TryParse(pipelineDefinition, out int definition);
             if(!isDefinitionNum) 
             {
-                definition = (await buildHttpClient.GetDefinitionsAsync(new System.Guid(project), pipelineDefinition, cancellationToken: cancellationToken)).FirstOrDefault().Id;
+                try
+                {
+                    definition = (await buildHttpClient.GetDefinitionsAsync(new System.Guid(project), pipelineDefinition, cancellationToken: cancellationToken)).FirstOrDefault().Id;
+                }
+                catch (Exception ex)
+                {
+                    throw new ArgumentException(StringUtil.Loc("PipelineDoesNotExist", pipelineDefinition));
+                }
             }
             var definitions = new List<int>() { definition };
 
